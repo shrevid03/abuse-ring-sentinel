@@ -1,0 +1,33 @@
+# compliance_rules.yaml
+# Regulation-as-config: rules live here, not in code, so a regulatory change is a
+# config edit, not a redeploy. Seeded with real RBI-grounded requirements.
+# (Grounding: RBI Master Directions on Fraud Risk Management, July 2024, which
+#  incorporate the natural-justice requirement from the Supreme Court's
+#  Rajesh Agarwal judgment, 2023 — an opportunity to be heard before an account
+#  is classified as fraud. These are engineering rules, not legal advice.)
+
+rules:
+  - id: RBI-NJ-01
+    name: Human sign-off before fraud classification
+    principle: natural_justice
+    rule: No account may be auto-classified as fraud. Any adverse classification
+          requires a human review + sign-off (maps to the triage review band).
+    enforce: block_auto_classification
+
+  - id: RBI-AUD-02
+    name: Immutable audit trail
+    rule: Every recommendation and every human decision is appended to an
+          append-only ledger and retained; records are never overwritten.
+    enforce: append_only_ledger
+
+  - id: RBI-ACC-03
+    name: Attributed, reasoned decisions
+    rule: Every human decision (approve or override) must carry a reason and the
+          reviewer identity for accountability.
+    enforce: require_reason_and_reviewer
+
+  - id: RBI-RPT-04
+    name: Timely reporting flag
+    rule: Cases confirmed as fraud are marked reportable so downstream reporting
+          timelines to law-enforcement / regulator can be tracked.
+    enforce: mark_reportable
