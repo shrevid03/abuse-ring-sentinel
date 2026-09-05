@@ -3,29 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Abuse-Ring Sentinel — catching coordinated fraud a per-transaction model can't see</title>
+<title>Abuse-Ring Sentinel — graph AI for coordinated payment fraud</title>
+<meta name="description" content="A structural-risk layer for Razorpay: a graph neural network that catches coordinated fraud rings per-transaction models miss, stress-tested against evasion, with human-in-the-loop review and an auditable decision trail.">
+<meta name="theme-color" content="#0a0809">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Abuse-Ring Sentinel — graph AI for coordinated payment fraud">
+<meta property="og:description" content="Individually invisible, collectively obvious: a graph neural network that detects coordinated abuse rings, with human-in-the-loop review and an auditable trail.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Abuse-Ring Sentinel">
+<meta name="twitter:description" content="Graph AI for coordinated payment fraud — with human-in-the-loop review and an auditable trail.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0809'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ff2d3f' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23ff2d3f'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --navy-0:#081020;      /* deepest */
-    --navy-1:#0a1428;      /* base bg */
-    --navy-2:#0f1d38;      /* surface */
-    --navy-3:#15294b;      /* raised */
-    --line:#20365f;        /* hairlines */
-    --cyan:#26e0d4;        /* primary accent */
-    --cyan-dim:#1aa89f;
-    --green:#46f08a;       /* cleared / positive */
-    --coral:#ff5c78;       /* fraud ring */
-    --coral-dim:#c73e58;
-    --ink:#e8f1ff;         /* primary text */
-    --muted:#8aa2c6;       /* secondary text */
-    --faint:#5c6f92;       /* tertiary */
+    --navy-0:#060507;      /* deepest */
+    --navy-1:#0a0809;      /* base bg (near-black) */
+    --navy-2:#141013;      /* surface */
+    --navy-3:#1e161a;      /* raised */
+    --line:#3a2328;        /* red-tinted hairlines */
+    --cyan:#ff2d3f;        /* PRIMARY accent = neon red */
+    --cyan-dim:#b81f2c;
+    --green:#3ddc84;       /* safe / cleared / human */
+    --coral:#ff4757;       /* fraud ring (hot red) */
+    --coral-dim:#c7303f;
+    --ink:#f5eef0;         /* primary text (warm white) */
+    --muted:#a0949a;       /* secondary text */
+    --faint:#6b5f63;       /* tertiary */
     --maxw:1120px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
+  html,body{overflow-x:hidden;width:100%;max-width:100%}
+  *{max-width:100%}
   body{
     background:var(--navy-1);
     color:var(--ink);
@@ -65,7 +76,8 @@
   #hero .content{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
     align-items:center;text-align:center;padding:0 20px;z-index:5}
   #hero h1{font-size:clamp(38px,7vw,84px);font-weight:700;max-width:14ch}
-  #hero h1 .glow{color:var(--cyan);text-shadow:0 0 30px rgba(38,224,212,.5)}
+  #hero h1 .glow{color:var(--cyan);text-shadow:0 0 30px rgba(38,224,212,.5);animation:breathe 4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{text-shadow:0 0 26px rgba(38,224,212,.35)}50%{text-shadow:0 0 44px rgba(38,224,212,.7)}}
   #hero .tag{margin-top:22px;font-size:clamp(16px,2.2vw,21px);color:var(--muted);max-width:52ch}
   #hero .tag b{color:var(--ink);font-weight:600}
   #hero .cta{margin-top:38px;display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
@@ -185,6 +197,87 @@
   footer{border-top:1px solid var(--line);padding:48px clamp(20px,5vw,48px);text-align:center;color:var(--faint)}
   footer .flink{margin-top:14px;display:flex;gap:22px;justify-content:center;flex-wrap:wrap;font-size:14px}
 
+
+  /* analyst copilot chat */
+  .chatbox{background:var(--navy-2);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:40px;
+    box-shadow:0 30px 80px -50px rgba(0,0,0,.8)}
+  .chat-head{padding:14px 20px;border-bottom:1px solid var(--line);font-family:"IBM Plex Mono";font-size:12.5px;
+    color:var(--muted);display:flex;align-items:center;gap:10px}
+  .chat-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+  .chat-log{padding:22px 20px;min-height:230px;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+  .msg{max-width:80%;padding:11px 15px;border-radius:12px;font-size:14.5px;line-height:1.5;white-space:pre-wrap}
+  .msg.you{align-self:flex-end;background:var(--navy-3);color:var(--ink);border:1px solid var(--line)}
+  .msg.bot{align-self:flex-start;background:rgba(38,224,212,.07);color:var(--ink);border:1px solid rgba(38,224,212,.25)}
+  .msg .ev{display:block;margin-top:7px;font-family:"IBM Plex Mono";font-size:11.5px;color:var(--cyan)}
+  .msg.typing{color:var(--faint);font-family:"IBM Plex Mono";font-size:13px}
+  .chat-sugg{display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 6px}
+  .chat-sugg button{font-size:12.5px;padding:7px 12px;border-radius:16px;border:1px solid var(--line);
+    background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;font-family:inherit}
+  .chat-sugg button:hover{border-color:var(--cyan);color:var(--cyan)}
+  .chat-input{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--line)}
+  .chat-input input{flex:1;background:var(--navy-0);border:1px solid var(--line);border-radius:9px;padding:11px 14px;
+    color:var(--ink);font-family:inherit;font-size:14px;outline:none}
+  .chat-input input:focus{border-color:var(--cyan)}
+  .chat-input button{font-family:"Space Grotesk";font-weight:600;background:var(--cyan);color:var(--navy-0);
+    border:none;border-radius:9px;padding:0 20px;cursor:pointer}
+
+  @media(max-width:560px){
+    #hero h1{font-size:clamp(30px,9vw,44px)}
+    #hero .tag{font-size:15px}
+    section.band{padding:56px 18px}
+    .chat-log{min-height:180px}
+    .msg{max-width:92%}
+    .demo-head{flex-direction:column;align-items:flex-start}
+  }
+
+  /* cinematic hero: hooded threat resolves into the graph */
+  #graph{opacity:.22;transition:opacity 1.5s ease}
+  #graph{z-index:2}
+  #graph.live{opacity:1}
+  #heroThreat{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:4;
+    pointer-events:none;transition:opacity 1.3s ease,transform 1.3s ease}
+  #heroThreat{z-index:1}
+  #heroThreat.settled{opacity:.42;transform:scale(1.02)}
+  #heroThreat svg{width:min(84vh,660px);height:auto;
+    filter:drop-shadow(0 0 45px rgba(255,45,63,.45)) drop-shadow(0 0 12px rgba(255,45,63,.6))}
+  #heroThreat .ring1{animation:ringpulse 2.4s ease-in-out infinite}
+  #heroThreat .eye{animation:eyepulse 1.8s ease-in-out infinite}
+  @keyframes ringpulse{0%,100%{stroke-opacity:.75}50%{stroke-opacity:1}}
+  @keyframes eyepulse{0%,100%{opacity:.7}50%{opacity:1}}
+  #hero .vignette{z-index:3;background:radial-gradient(ellipse 70% 60% at 50% 44%,rgba(6,5,7,.55),rgba(6,5,7,.2) 55%,rgba(6,5,7,.85))}
+
+
+  /* ===== console layout ===== */
+  #bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  #bg #graph{position:absolute;inset:0;width:100%;height:100%}
+  #bg #heroThreat{position:absolute;inset:0}
+  #bg .vignette{position:absolute;inset:0}
+  nav{background:linear-gradient(var(--navy-1),rgba(10,8,9,.75) 60%,transparent)}
+  nav .tabs{display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap}
+  .tab{font-family:"Space Grotesk";font-weight:600;font-size:13.5px;color:var(--muted);
+    background:transparent;border:1px solid transparent;border-radius:8px;padding:8px 14px;cursor:pointer;transition:all .18s}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--cyan);border-color:var(--line);background:rgba(255,45,63,.10);
+    box-shadow:0 0 18px rgba(255,45,63,.22)}
+  @media(max-width:640px){nav{flex-direction:column;align-items:flex-start;gap:10px} nav .tabs{font-size:12px}}
+  #panels{position:relative;z-index:5;padding-top:74px}
+  @media(max-width:640px){#panels{padding-top:104px}}
+  .tabpanel{display:none;min-height:100vh;background:rgba(8,7,9,.72);backdrop-filter:blur(3px)}
+  .tabpanel.active{display:block;animation:fadeIn .5s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  /* overview shows the full-screen graph behind it */
+  #pnl-overview{background:transparent;backdrop-filter:none}
+  /* live-graph tab: lighter scrim so the network reads as the star */
+  #pnl-live{background:rgba(8,7,9,.5)}
+  .scroll-cue{display:none!important}
+
+  /* readability: frost the text sections that sit over the full-screen graph */
+  #pnl-overview #problem{background:rgba(8,7,9,.86);backdrop-filter:blur(6px);
+    border:1px solid var(--line);border-radius:20px;margin:14px auto 48px}
+  #pnl-overview #hero h1,#pnl-overview #hero .tag{text-shadow:0 2px 22px rgba(6,5,7,.9)}
+  #pnl-overview #hero .tag{color:#c9bcc0}
+
+
   @media(prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
     .reveal{opacity:1;transform:none}
@@ -192,22 +285,56 @@
 </style>
 </head>
 <body>
+<div id="bg">
+<canvas id="graph"></canvas>
+  <div id="heroThreat" aria-hidden="true">
+    <svg viewBox="0 0 440 460" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="rg" cx="50%" cy="46%" r="55%">
+          <stop offset="0%" stop-color="#ff2d3f" stop-opacity="0.20"/>
+          <stop offset="60%" stop-color="#ff2d3f" stop-opacity="0.05"/>
+          <stop offset="100%" stop-color="#ff2d3f" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <circle cx="220" cy="235" r="185" fill="url(#rg)"/>
+      <circle class="ring2" cx="220" cy="235" r="170" fill="none" stroke="#ff2d3f" stroke-width="1" stroke-opacity="0.35"/>
+      <circle class="ring1" cx="220" cy="235" r="150" fill="none" stroke="#ff2d3f" stroke-width="2.5"/>
+      <!-- lightning -->
+      <polyline points="70,150 95,175 78,185 108,215" fill="none" stroke="#ff2d3f" stroke-width="2" stroke-opacity="0.8"/>
+      <polyline points="370,150 345,175 362,185 332,215" fill="none" stroke="#ff2d3f" stroke-width="2" stroke-opacity="0.8"/>
+      <polyline points="120,360 100,392 122,396 104,428" fill="none" stroke="#ff2d3f" stroke-width="2" stroke-opacity="0.7"/>
+      <polyline points="320,360 340,392 318,396 336,428" fill="none" stroke="#ff2d3f" stroke-width="2" stroke-opacity="0.7"/>
+      <!-- hooded figure -->
+      <path d="M130 400 C120 312 132 250 168 200 C188 152 206 120 220 120 C234 120 252 152 272 200 C308 250 320 312 310 400 Z"
+            fill="#0a0809" stroke="#ff2d3f" stroke-width="1.5" stroke-opacity="0.55"/>
+      <ellipse cx="220" cy="212" rx="47" ry="60" fill="#050405"/>
+      <path d="M173 210 Q220 150 267 210" fill="none" stroke="#ff2d3f" stroke-width="1.5" stroke-opacity="0.5"/>
+      <circle class="eye" cx="204" cy="206" r="4.5" fill="#ff2d3f"/>
+      <circle class="eye" cx="236" cy="206" r="4.5" fill="#ff2d3f"/>
+      <ellipse cx="220" cy="392" rx="120" ry="16" fill="#ff2d3f" opacity="0.10"/>
+    </svg>
+  </div>
+  <div class="vignette"></div>
+</div>
 <div id="progress"></div>
 
 <nav>
   <div class="brand"><span class="dot"></span>Abuse-Ring Sentinel</div>
-  <div class="links">
-    <a href="#problem">Problem</a>
-    <a href="#demo">Live graph</a>
-    <a href="#how">How it works</a>
-    <a href="#results">Results</a>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-target="pnl-overview">Overview</button>
+    <button class="tab" data-target="pnl-live">Live graph</button>
+    <button class="tab" data-target="pnl-how">How it works</button>
+    <button class="tab" data-target="pnl-results">Results</button>
+    <button class="tab" data-target="pnl-decide">Decide</button>
+    <button class="tab" data-target="pnl-more">More</button>
   </div>
 </nav>
+<main id="panels">
+<div class="tabpanel active" id="pnl-overview">
 
 <!-- HERO -->
 <header id="hero">
-  <canvas id="graph"></canvas>
-  <div class="vignette"></div>
+  
   <div class="content">
     <h1>The fraud that's <span class="glow">invisible one account at a time</span></h1>
     <p class="tag">A ring of colluding accounts each looks normal on its own row of data. It only gives itself away in the <b>shape</b> of its connections — so we detect it with a graph, not a per-transaction score.</p>
@@ -241,6 +368,8 @@
   </div>
 </section>
 
+</div>
+<div class="tabpanel" id="pnl-live">
 <!-- DEMO -->
 <div id="demo">
   <div class="reveal" style="margin-bottom:34px">
@@ -260,7 +389,7 @@
     <canvas id="demoCanvas"></canvas>
     <div class="demo-foot">
       <div class="legend">
-        <span><i class="swatch" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></i>account</span>
+        <span><i class="swatch" style="background:#cfd4dc;box-shadow:0 0 8px rgba(207,212,220,.6)"></i>account</span>
         <span><i class="swatch" style="background:var(--coral);box-shadow:0 0 8px var(--coral)"></i>flagged ring</span>
         <span><i class="swatch" style="background:var(--green);box-shadow:0 0 8px var(--green)"></i>cleared</span>
       </div>
@@ -269,6 +398,8 @@
   </div>
 </div>
 
+</div>
+<div class="tabpanel" id="pnl-how">
 <!-- HOW -->
 <section class="band" id="how">
   <div class="reveal">
@@ -295,6 +426,29 @@
   </div>
 </section>
 
+
+</div>
+<div class="tabpanel" id="pnl-decide">
+<!-- COPILOT -->
+<section class="band" id="copilot">
+  <div class="reveal">
+    <div class="kicker">Analyst copilot</div>
+    <h2>Question the case, don't just read it</h2>
+    <p class="lead">In the review band, a reviewer can interrogate a flagged account in plain language. Every answer is grounded only in that account's evidence — the copilot won't invent facts. <span style="color:var(--faint)">Scripted preview; the live version runs on Gemini in the repo.</span></p>
+  </div>
+  <div class="chatbox reveal">
+    <div class="chat-head"><span class="chat-dot"></span> reviewing flagged account <span class="mono">3051</span> · pattern device · risk 1.00</div>
+    <div class="chat-log" id="chatLog"></div>
+    <div class="chat-sugg" id="chatSugg"></div>
+    <div class="chat-input">
+      <input id="chatIn" placeholder="Ask about this account…" autocomplete="off">
+      <button id="chatSend">Ask</button>
+    </div>
+  </div>
+</section>
+
+</div>
+<div class="tabpanel" id="pnl-results">
 <!-- RESULTS -->
 <section class="band" id="results" style="max-width:none;padding-left:0;padding-right:0">
  <div style="max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,48px)">
@@ -349,6 +503,8 @@
   </div>
 </section>
 
+</div>
+<div class="tabpanel" id="pnl-more">
 <!-- FUTURE -->
 <section class="band">
   <div class="reveal">
@@ -370,10 +526,14 @@
     <a href="#hero">Top</a>
     <a href="#demo">Live graph</a>
     <a href="#results">Results</a>
-    <a href="#" id="repoLink">GitHub repo →</a>
+    <a href="https://github.com/shrevid03/abuse-ring-sentinel" id="repoLink" target="_blank" rel="noopener">GitHub repo →</a>
+    <a href="mailto:you@example.com">Email</a>
+    <a href="tel:+910000000000">Call</a>
   </div>
   <div style="margin-top:22px;font-size:12px;color:var(--faint)" class="mono">Built for the Razorpay AI Buildathon · results measured on synthetic + real held-out data</div>
 </footer>
+</div>
+</main>
 
 <script>
 (function(){
@@ -424,7 +584,7 @@
     const ctx = canvas.getContext('2d');
     let W,H,dpr,nodes=[],edges=[],ringSet=new Set(),detected=false,scanR=0,scanning=false;
     let hover=-1, raf=null;
-    const O = Object.assign({normal:64, ring:9, interactive:false, small:false}, opts||{});
+    const O = Object.assign({normal:64, ring:9, interactive:false, small:false, electric:false}, opts||{});
 
     function size(){
       dpr = Math.min(window.devicePixelRatio||1, 2);
@@ -489,23 +649,33 @@
         const a=nodes[i], b=nodes[j];
         const isRing = detected && ringSet.has(i) && ringSet.has(j);
         ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-        if(isRing){ ctx.strokeStyle='rgba(255,92,120,.55)'; ctx.lineWidth=1.4; }
-        else { ctx.strokeStyle='rgba(38,224,212,.10)'; ctx.lineWidth=1; }
+        if(isRing){ ctx.strokeStyle='rgba(255,45,63,.6)'; ctx.lineWidth=1.5; }
+        else { ctx.strokeStyle='rgba(207,212,220,.09)'; ctx.lineWidth=1; }
         ctx.stroke();
+      }
+      // electric arcs
+      if(O.electric && !reduce){
+        if(detected){ for(const [i,j] of edges){ if(ringSet.has(i)&&ringSet.has(j)&&Math.random()<0.35){
+          ctx.strokeStyle='rgba(255,95,105,'+(0.55+Math.random()*0.45)+')'; ctx.lineWidth=1.2;
+          ctx.shadowColor='#ff2d3f'; ctx.shadowBlur=9; bolt(nodes[i].x,nodes[i].y,nodes[j].x,nodes[j].y,5,7); ctx.shadowBlur=0; } } }
+        if(Math.random()<0.22 && edges.length){ const e=edges[(Math.random()*edges.length)|0]; sparks.push({i:e[0],j:e[1],life:5}); }
+        for(let k=sparks.length-1;k>=0;k--){ const sp=sparks[k], a=nodes[sp.i], b=nodes[sp.j];
+          if(a&&b){ ctx.strokeStyle='rgba(255,120,130,'+(sp.life/6)+')'; ctx.lineWidth=1.3; ctx.shadowColor='#ff2d3f'; ctx.shadowBlur=10;
+          bolt(a.x,a.y,b.x,b.y,6,9); ctx.shadowBlur=0; } sp.life--; if(sp.life<=0) sparks.splice(k,1); }
       }
       // scan sweep
       if(scanning){
-        ctx.beginPath(); ctx.arc(W/2,H/2,scanR,0,7); ctx.strokeStyle='rgba(38,224,212,.5)';
+        ctx.beginPath(); ctx.arc(W/2,H/2,scanR,0,7); ctx.strokeStyle='rgba(255,45,63,.6)';
         ctx.lineWidth=2; ctx.stroke();
-        ctx.beginPath(); ctx.arc(W/2,H/2,scanR,0,7); ctx.strokeStyle='rgba(38,224,212,.12)'; ctx.lineWidth=16; ctx.stroke();
+        ctx.beginPath(); ctx.arc(W/2,H/2,scanR,0,7); ctx.strokeStyle='rgba(255,45,63,.14)'; ctx.lineWidth=16; ctx.stroke();
       }
       // nodes
       for(let i=0;i<nodes.length;i++){
         const n=nodes[i]; const isRing=ringSet.has(i);
         let col, glow;
-        if(detected && isRing){ col='#ff5c78'; glow='rgba(255,92,120,.9)'; }
-        else if(detected && !isRing){ col='#46f08a'; glow='rgba(70,240,138,.5)'; }
-        else { col='#26e0d4'; glow='rgba(38,224,212,.6)'; }
+        if(detected && isRing){ col='#ff2d3f'; glow='rgba(255,45,63,.95)'; }
+        else if(detected && !isRing){ col='#3ddc84'; glow='rgba(61,220,132,.5)'; }
+        else { col='#cfd4dc'; glow='rgba(207,212,220,.45)'; }
         const pulse = (detected&&isRing&&!reduce)?(1+0.35*Math.sin(performance.now()/220+i)):1;
         ctx.beginPath(); ctx.arc(n.x,n.y,n.r*3.2*pulse,0,7);
         ctx.fillStyle=glow.replace(/[\d.]+\)$/,'0.16)'); ctx.fill();
@@ -527,6 +697,10 @@
       }
     }
     function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+    let sparks=[];
+    function bolt(ax,ay,bx,by,seg,amp){ ctx.beginPath(); ctx.moveTo(ax,ay);
+      for(let i=1;i<seg;i++){ const t=i/seg; ctx.lineTo(ax+(bx-ax)*t+(Math.random()-.5)*amp, ay+(by-ay)*t+(Math.random()-.5)*amp); }
+      ctx.lineTo(bx,by); ctx.stroke(); }
 
     let settle=0;
     function loop(){
@@ -557,9 +731,19 @@
   }
 
   /* hero graph */
-  const heroG = makeGraph(document.getElementById('graph'), {normal:70, ring:9, interactive:false,
+  const heroG = makeGraph(document.getElementById('graph'), {normal:70, ring:9, interactive:false, electric:true,
     onDone:(n)=>{ setStatus(`<span class="live">● ring detected</span> — ${n} coordinated accounts flagged for review`); }});
   heroG.init();
+
+  /* hero threat -> graph resolve */
+  const heroThreat = document.getElementById('heroThreat');
+  const graphCanvas = document.getElementById('graph');
+  function resolveHero(){
+    if(heroThreat) heroThreat.classList.add('settled');
+    if(graphCanvas) graphCanvas.classList.add('live');
+  }
+  if(reduce){ resolveHero(); }
+  else { setTimeout(resolveHero, 2500); }
   const statusEl=document.getElementById('scanStatus');
   function setStatus(html){ statusEl.innerHTML=html; }
   setStatus('network settling…');
@@ -568,10 +752,10 @@
   else setStatus('ring detected — 9 coordinated accounts flagged');
   const scrollCue=document.querySelector('.scroll-cue');
   function hideCue(){ if(scrollCue) scrollCue.style.opacity='0'; }
-  document.getElementById('runHero').addEventListener('click',()=>{ setStatus('scanning…'); heroG.startScan(); hideCue(); });
+  document.getElementById('runHero').addEventListener('click',()=>{ resolveHero(); setStatus('scanning…'); heroG.startScan(); hideCue(); });
 
   /* demo graph */
-  const demoG = makeGraph(document.getElementById('demoCanvas'), {normal:52, ring:9, interactive:true,
+  const demoG = makeGraph(document.getElementById('demoCanvas'), {normal:52, ring:9, interactive:true, electric:true,
     onDone:(n)=>{ setVerdict(`<b>Ring detected</b> — ${n} accounts form a dense collusion cluster. Routed to human review.`); }});
   demoG.init();
   const verdict=document.getElementById('demoVerdict');
@@ -587,10 +771,62 @@
   // miniB reveals the ring
   setTimeout(()=>{ if(!reduce) miniB.startScan(); }, 1200);
 
-  /* footer repo link placeholder */
-  document.getElementById('repoLink').addEventListener('click',(e)=>{
-    e.preventDefault(); alert('Point this at your GitHub repo URL before submitting.');
-  });
+
+  /* ---------- analyst copilot (grounded, scripted preview) ---------- */
+  const KB = [
+    {k:['why','flag','flagged','suspicious'], a:"Account 3051 was flagged because its connections form a coordinated structure, not because of its own stats \u2014 which look normal. Three signals stacked up.", ev:"device sharing + hub fan-out + dense collusion block"},
+    {k:['device','fingerprint','share'], a:"It shares one device fingerprint (9146) with six other accounts \u2014 3050, 3052, 3057, 3058, 3059, 3061. Independent customers almost never share a device like that.", ev:"device=9146 \u00b7 7 accounts"},
+    {k:['ring','accounts','who','members','cluster','collusion','block'], a:"It sits in a dense bipartite block of 14 accounts (density 0.14, zero triangles) \u2014 a buyer/seller collusion signature. A per-row model can't see this; only the graph can.", ev:"block_nodes=[3050\u20263059]"},
+    {k:['hub','fan','fanout','bust'], a:"It receives from hub account 3050, which fans money out to 13 accounts in a tight window \u2014 a classic bust-out signature.", ev:"hub=3050 \u2192 13 targets"},
+    {k:['score','risk','confidence','model'], a:"The GraphSAGE model scored it 1.00 \u2014 maximum risk. But score alone never decides the outcome; it routes to human review.", ev:"GNN risk 1.00"},
+    {k:['rbi','rule','compliance','law','legal','regulation'], a:"Rule RBI-NJ-01 applies: no account can be auto-classified as fraud. A human must sign off first \u2014 the natural-justice requirement from India's fraud-risk rules. That's why the recommendation is REVIEW, not auto-flag.", ev:"RBI-NJ-01 \u00b7 natural justice"},
+    {k:['override','decide','should','clear','confirm','action'], a:"That's your call \u2014 the copilot only lays out evidence. If you override to CLEAR, you must give a reason, and both the model's recommendation and your decision are stored in parallel for the audit trail.", ev:"override requires a reason"},
+    {k:['sure','certain','definitely','fraud','proof'], a:"Not certain \u2014 the evidence is strong (score 1.00, three structural signals) but circumstantial. That's exactly why it goes to a human rather than an automatic block.", ev:"strong, not conclusive"},
+    {k:['similar','precedent','before','past','seen'], a:"A very similar device+layering ring was resolved earlier and confirmed as fraud by an analyst. That precedent is surfaced to you \u2014 as context, not an automatic decision.", ev:"1 similar case \u2192 flagged"}
+  ];
+  function answer(q){
+    const t=q.toLowerCase();
+    let best=null,score=0;
+    for(const item of KB){ const s=item.k.reduce((a,k)=>a+(t.includes(k)?1:0),0); if(s>score){score=s;best=item;} }
+    if(!best||score===0) return {a:"I don't have that in the evidence for this account. I can only answer from what's been established about account 3051.",ev:null};
+    return best;
+  }
+  const log=document.getElementById('chatLog'), input=document.getElementById('chatIn');
+  function add(role,text,ev){
+    const d=document.createElement('div'); d.className='msg '+role;
+    d.textContent=text; if(ev){const e=document.createElement('span');e.className='ev';e.textContent='evidence: '+ev;d.appendChild(e);}
+    log.appendChild(d); log.scrollTop=log.scrollHeight; return d;
+  }
+  function ask(q){
+    if(!q.trim())return; add('you',q);
+    const t=add('bot','copilot is checking the evidence\u2026'); t.classList.add('typing');
+    const res=answer(q);
+    setTimeout(()=>{ t.remove(); add('bot',res.a,res.ev); }, reduce?0:650);
+  }
+  document.getElementById('chatSend').addEventListener('click',()=>{ ask(input.value); input.value=''; });
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ ask(input.value); input.value=''; }});
+  const suggs=['Why was this flagged?','Which accounts are in the ring?','What does the RBI rule require?','Should I override?'];
+  const sc=document.getElementById('chatSugg');
+  suggs.forEach(q=>{ const b=document.createElement('button'); b.textContent=q; b.onclick=()=>ask(q); sc.appendChild(b); });
+  add('bot','Reviewing account 3051. Ask me anything about why it was flagged \u2014 or tap a question below.',null);
+
+
+
+  /* ===== tab switching ===== */
+  (function(){
+    const tabs=document.querySelectorAll('.tab'), panels=document.querySelectorAll('.tabpanel');
+    tabs.forEach(t=>t.addEventListener('click',()=>{
+      tabs.forEach(x=>x.classList.remove('active'));
+      panels.forEach(p=>p.classList.remove('active'));
+      t.classList.add('active');
+      const tgt=document.getElementById(t.dataset.target);
+      if(tgt) tgt.classList.add('active');
+      window.scrollTo(0,0);
+      window.dispatchEvent(new Event('resize'));
+      if(t.dataset.target==='pnl-live'){ setTimeout(()=>{ window.dispatchEvent(new Event('resize')); try{demoG.shuffle();}catch(e){} }, 60); }
+    }));
+  })();
+
 })();
 </script>
 </body>
