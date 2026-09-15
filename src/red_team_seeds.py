@@ -26,7 +26,6 @@ N_SEEDS = 5
 
 def main():
     x, y, ei = C.load()
-    xt = torch.tensor(C.norm(x))
 
     clean_scores = []
     attacked_scores = []
@@ -41,6 +40,12 @@ def main():
         # Different held-out rings each run
         train, test, n_rings = C.holdout_ring_masks(
             y, ei, test_frac=0.3, seed=s
+        )
+
+        # Fit preprocessing ONLY on this seed's training partition.
+        xt = torch.tensor(
+            C.norm_train(x, train),
+            dtype=torch.float32
         )
 
         # ---------------- CLEAN MODEL ----------------

@@ -28,8 +28,11 @@ def ring_recall(model, xt, ei_np, y, test):
 
 def main():
     x, y, ei = C.load()
-    xt = torch.tensor(C.norm(x))
     train, test, n = C.holdout_ring_masks(y, ei, 0.3, seed=7)
+    xt = torch.tensor(
+        C.norm_train(x, train),
+        dtype=torch.float32
+    )
     model = train_inductive(xt, ei, y, train)
     r_clean = ring_recall(model, xt, ei, y, test)
     r_atk = ring_recall(model, xt, RT.attack(ei, y, seed=1), y, test)

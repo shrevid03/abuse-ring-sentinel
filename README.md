@@ -66,7 +66,7 @@ RandomForest wins here — and that's expected: Elliptic's features already incl
 
 **Defensive robustness** (ring recall under structural perturbation, inductive, 5-seed mean ± std):
 
-`clean 1.000 ± 0.000 → perturbed 0.007 ± 0.013 → after adversarial hardening 0.938 ± 0.027`
+`clean 1.000 ± 0.000 → perturbed 0.003 ± 0.007 → after adversarial hardening 0.931 ± 0.027`
 
 The unhardened detector is fragile under deliberate structural perturbation — which is exactly why we test for it. Adversarial training restores robustness on unseen rings. All experiments run only on our synthetic test graph, against our own detector.
 
@@ -128,7 +128,7 @@ redteam-lab/                co-evolving red-team research prototype
 ```
 
 ## Known caveats (documented, honest)
-Feature normalization currently uses statistics over all nodes; base features include local degree/counterparty summaries; structural-RF graph statistics are computed on the full static graph; the 5 seeds are holdouts of one generated graph; the red-team attack uses ground-truth labels as an oracle (sandbox) and does not recompute node features after each perturbation (a topology-sensitivity test). These are acknowledged limitations, not solved.
+Feature normalization is fit only on training nodes and the frozen training statistics are applied to held-out nodes. Remaining limitations: base features include local degree/counterparty summaries; structural-RF graph statistics are computed on the full static graph; the 5 seeds are holdouts of one generated graph; the red-team attack uses ground-truth labels as an oracle (sandbox) and does not recompute node features after each perturbation (a topology-sensitivity test). These remaining limitations are documented explicitly.
 
 ## Future work
 - **Temporal GNNs** (EvolveGCN / TGN) — the real fix for the Elliptic distribution-shift ceiling.

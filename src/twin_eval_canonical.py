@@ -4,11 +4,11 @@ twin_eval_canonical.py — CANONICAL twin evaluation — held-out unseen rings; 
 Split: HELD-OUT UNSEEN RINGS (inductive). Whole rings are recovered as connected
 components of the fraud-only subgraph and split train/test, so the test rings —
 and, for the GNN, their edges — never participate in training. This is stricter
-than a random node split and is a synthetic proxy for temporal generalization.
+than a random node split and tests generalization to held-out fraud components.
 
 All three models are evaluated on the SAME test rings:
   - RandomForest (per-row features)
-  - RandomForest + hand-engineered structural features (pagerank, k-core, triangles, device group)
+  - RandomForest + hand-engineered structural features (pagerank, clustering, triangles, k-core)
   - GraphSAGE (INDUCTIVE: trained on train-only edges, inference on the full graph)
 
 Run:  PYTHONPATH=src python src/twin_eval_canonical.py
@@ -48,17 +48,25 @@ def holdout_ring_masks(y, ei, test_frac=0.3, seed=7):
 
 
 def train_only_edges(ei, train_mask):
-    """Keep only edges where BOTH endpoints are train nodes (no leakage)."""
+    """Keep only edges where BOTH endpoints are train nodes."""
     src, dst = ei
     keep = train_mask[src] & train_mask[dst]
     return ei[:, keep]
 
 
-def norm(x): return (x - x.mean(0)) / (x.std(0) + 1e-6)
+def norm_train(x, train_mask):
+    """Fit normalization statistics on training nodes only."""
+    mu = x[train_mask].mean(0)
+    sd = x[train_mask].std(0)
+    return (x - mu) / (sd + 1e-6)
 
 
 def gnn_inductive(x, y, ei, train):
-    xt = torch.tensor(norm(x)); yt = torch.tensor(y)
+    xt = torch.tensor(
+        norm_train(x, train),
+        dtype=torch.float32
+    )
+    yt = torch.tensor(y)
     tr_ei = train_only_edges(ei, train)                 # message passing: train edges only
     tr_und = torch.cat([torch.tensor(tr_ei), torch.tensor(tr_ei).flip(0)], 1)
     full_und = torch.cat([torch.tensor(ei), torch.tensor(ei).flip(0)], 1)
