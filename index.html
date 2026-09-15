@@ -375,7 +375,7 @@
   <div class="reveal" style="margin-bottom:34px">
     <div class="kicker">Live graph</div>
     <h2>Watch the detector catch a ring</h2>
-    <p class="lead">A synthetic payment network with one hidden collusion ring. Run the scan to see the graph neural network light up the coordinated cluster — then hover any node to inspect it.</p>
+    <p class="lead">A synthetic payment network with one hidden fraud ring. Run the scan to see the graph neural network light up the coordinated cluster — then hover any node to inspect it.</p>
   </div>
   <div class="demo-wrap reveal">
     <div class="demo-head">
@@ -455,7 +455,7 @@
   <div class="reveal">
     <div class="kicker">Measured, honestly</div>
     <h2>What structure buys you — and where it doesn't</h2>
-    <p class="lead">Tested on a controlled twin where structure is the only signal, and on the real Elliptic Bitcoin graph with a held-out temporal split.</p>
+    <p class="lead">Tested on a controlled twin where relational structure is the dominant signal, and on the real Elliptic Bitcoin graph with a held-out temporal split.</p>
   </div>
 
   <div class="stat-row reveal">
@@ -467,8 +467,9 @@
 
   <div class="bars reveal">
     <h3>Collusion recall — the pattern per-row models miss</h3>
-    <div class="cap">On the twin, a tabular baseline catches obvious fraud but misses the dense buyer–seller collusion. The graph model closes it completely.</div>
-    <div class="bar"><div class="bl"><span class="name">Tabular baseline (per-row)</span><span class="val">0.52</span></div><div class="track"><div class="fill base" data-w="52"></div></div></div>
+    <div class="cap">On the twin, a per-row baseline and even hand-engineered structural features plateau on dense buyer–seller collusion (bipartite blocks have near-zero triangles). Only the learned graph model closes it.</div>
+    <div class="bar"><div class="bl"><span class="name">Tabular baseline (per-row)</span><span class="val">0.61</span></div><div class="track"><div class="fill base" data-w="61"></div></div></div>
+    <div class="bar"><div class="bl"><span class="name">+ hand-engineered structural features</span><span class="val">0.82</span></div><div class="track"><div class="fill rf" data-w="82"></div></div></div>
     <div class="bar"><div class="bl"><span class="name">GraphSAGE (learned structure)</span><span class="val">1.00</span></div><div class="track"><div class="fill gnn" data-w="100"></div></div></div>
   </div>
 
@@ -583,6 +584,7 @@
   function makeGraph(canvas, opts){
     const ctx = canvas.getContext('2d');
     let W,H,dpr,nodes=[],edges=[],ringSet=new Set(),detected=false,scanR=0,scanning=false;
+    const RING_TYPES=['collusion','cycle','fanout','device']; let ringType='collusion', ringIdx=(Math.random()*4|0);
     let hover=-1, raf=null;
     const O = Object.assign({normal:64, ring:9, interactive:false, small:false, electric:false}, opts||{});
 
@@ -599,21 +601,29 @@
       for(let i=0;i<O.normal;i++){
         nodes.push({x:cx+(Math.random()-.5)*W*.8, y:cy+(Math.random()-.5)*H*.8, vx:0,vy:0, ring:false, r:2.6+Math.random()*1.4});
       }
-      // sparse organic edges
       for(let i=0;i<O.normal;i++){
         const k=1+(Math.random()*2|0);
         for(let j=0;j<k;j++){ const t=Math.random()*O.normal|0; if(t!==i) edges.push([i,t,false]); }
       }
-      // inject one ring: dense bipartite-ish cluster near a random anchor
-      const start=nodes.length, ax=cx+(Math.random()-.5)*W*.35, ay=cy+(Math.random()-.5)*H*.3;
-      for(let i=0;i<O.ring;i++){
-        nodes.push({x:ax+(Math.random()-.5)*70, y:ay+(Math.random()-.5)*70, vx:0,vy:0, ring:true, r:3.2+Math.random()*1.2});
+      // pick one of the four ring types (rotate each build)
+      ringType = RING_TYPES[ringIdx % RING_TYPES.length]; ringIdx++;
+      const start=nodes.length, n=O.ring, ax=cx+(Math.random()-.5)*W*.35, ay=cy+(Math.random()-.5)*H*.3;
+      for(let i=0;i<n;i++){
+        nodes.push({x:ax+(Math.random()-.5)*80, y:ay+(Math.random()-.5)*80, vx:0,vy:0, ring:true, r:3.2+Math.random()*1.2});
         ringSet.add(start+i);
       }
-      const half=Math.ceil(O.ring/2);
-      for(let a=0;a<half;a++) for(let b=half;b<O.ring;b++){ if(Math.random()<.8) edges.push([start+a,start+b,true]); }
-      // a couple of bridges so it's embedded, not floating
-      for(let i=0;i<2;i++) edges.push([start+(Math.random()*O.ring|0), Math.random()*O.normal|0, false]);
+      if(ringType==='collusion'){                 // dense bipartite buyer<->seller block
+        const half=Math.ceil(n/2);
+        for(let a=0;a<half;a++) for(let b=half;b<n;b++){ if(Math.random()<.8) edges.push([start+a,start+b,true]); }
+      } else if(ringType==='cycle'){              // closed money loop A->B->C->..->A
+        for(let i=0;i<n;i++) edges.push([start+i, start+((i+1)%n), true]);
+      } else if(ringType==='fanout'){             // one hub sprays to many mules (star)
+        for(let i=1;i<n;i++) edges.push([start, start+i, true]);
+      } else {                                     // device farm: all share one node + tight links
+        for(let i=1;i<n;i++) edges.push([start, start+i, true]);
+        for(let i=0;i<Math.floor(n/2);i++){ const a=start+1+(Math.random()*(n-1)|0), b=start+1+(Math.random()*(n-1)|0); if(a!==b) edges.push([a,b,true]); }
+      }
+      for(let i=0;i<2;i++) edges.push([start+(Math.random()*n|0), Math.random()*O.normal|0, false]);
     }
 
     function step(){
@@ -706,7 +716,7 @@
     function loop(){
       if(settle<220){ step(); settle++; }        // keep it lively early, then rest
       else if(hover>=0||scanning|| (detected&&!reduce)) step();
-      if(scanning){ scanR+=Math.max(W,H)/60; if(scanR>Math.hypot(W,H)){ scanning=false; detected=true; if(opts.onDone)opts.onDone(ringSet.size);} }
+      if(scanning){ scanR+=Math.max(W,H)/60; if(scanR>Math.hypot(W,H)){ scanning=false; detected=true; if(opts.onDone)opts.onDone(ringSet.size, ringType);} }
       draw(); raf=requestAnimationFrame(loop);
     }
 
@@ -727,12 +737,17 @@
 
     function init(){ size(); build(); loop(); }
     window.addEventListener('resize',()=>{ size(); });
-    return {init,startScan,reset,shuffle,get detected(){return detected;}};
+    return {init,startScan,reset,shuffle,get detected(){return detected;},get ringType(){return ringType;}};
   }
+
+  function ringPhrase(t){ return t==='cycle' ? 'form a money-laundering cycle (A→B→C→A)'
+      : t==='fanout' ? 'form a bust-out fan-out — one hub spraying to mules'
+      : t==='device' ? 'share one device — a device/identity farm'
+      : 'form a dense buyer–seller collusion block'; }
 
   /* hero graph */
   const heroG = makeGraph(document.getElementById('graph'), {normal:70, ring:9, interactive:false, electric:true,
-    onDone:(n)=>{ setStatus(`<span class="live">● ring detected</span> — ${n} coordinated accounts flagged for review`); }});
+    onDone:(n,t)=>{ setStatus(`<span class="live">● ring detected</span> — ${n} accounts ${ringPhrase(t)}`); }});
   heroG.init();
 
   /* hero threat -> graph resolve */
@@ -756,13 +771,13 @@
 
   /* demo graph */
   const demoG = makeGraph(document.getElementById('demoCanvas'), {normal:52, ring:9, interactive:true, electric:true,
-    onDone:(n)=>{ setVerdict(`<b>Ring detected</b> — ${n} accounts form a dense collusion cluster. Routed to human review.`); }});
+    onDone:(n,t)=>{ setVerdict(`<b>Ring detected (${t})</b> — ${n} accounts ${ringPhrase(t)}. Routed to human review.`); }});
   demoG.init();
   const verdict=document.getElementById('demoVerdict');
   function setVerdict(html){ verdict.innerHTML=html; }
   document.getElementById('cScan').addEventListener('click',()=>{ setVerdict('Scanning network…'); demoG.startScan(); });
   document.getElementById('cReset').addEventListener('click',()=>{ demoG.reset(); setVerdict('Idle — run detection to scan the network.'); });
-  document.getElementById('cShuffle').addEventListener('click',()=>{ demoG.shuffle(); setVerdict('New network generated — run detection.'); });
+  document.getElementById('cShuffle').addEventListener('click',()=>{ demoG.shuffle(); setVerdict('New network with a different ring type generated — run detection.'); });
 
   /* two little contrast graphs in the problem section */
   const miniA=makeGraph(document.getElementById('miniA'),{normal:14,ring:6,interactive:false,small:true});
